@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像結合ツール (Grid Combiner)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: #f3f4f6;
+        }
+        .drop-zone {
+            transition: all 0.3s ease;
+            border: 2px dashed #cbd5e1;
+        }
+        .drop-zone.drag-over {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            transform: scale(1.02);
+        }
+        .drop-zone:hover {
+            border-color: #94a3b8;
+        }
+        .checkered-bg {
+            background-image:
+                linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+                linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+                linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            background-color: #ffffff;
+        }
+        /* Tab Active State */
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #3b82f6;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-gray-800">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm flex-none z-10 relative">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-gray-700 truncate">
+                <i class="fa-regular fa-images mr-2 text-blue-500"></i>画像結合ツール
+            </h1>
+            <button onclick="resetAll()" class="text-sm text-gray-500 hover:text-red-500 transition flex items-center flex-none ml-4">
+                <i class="fa-solid fa-rotate-right mr-1"></i>リセット
+            </button>
+        </div>
+        <!-- Tabs -->
+        <div class="max-w-6xl mx-auto px-4 flex space-x-6 overflow-x-auto scrollbar-hide relative top-[1px]">
+            <button id="tab-2up" onclick="switchMode('2up')" class="tab-active py-3 px-1 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-blue-500 whitespace-nowrap transition">
+                2枚結合 (横並び)
+            </button>
+            <button id="tab-4up" onclick="switchMode('4up')" class="py-3 px-1 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-blue-500 whitespace-nowrap transition">
+                4枚結合 (2x2グリッド)
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow p-4 md:p-6 overflow-y-auto bg-gray-50">
+        <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+            <!-- Left Sidebar: Controls -->
+            <div class="lg:col-span-4 lg:sticky lg:top-6 space-y-4">
+                
+                <!-- Upload Areas Panel -->
+                <div class="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-gray-100">
+                    <h2 class="font-bold mb-3 text-sm text-gray-600 uppercase tracking-wide flex justify-between items-center">
+                        <span>画像を選択</span>
+                        <span class="text-[10px] text-gray-400 font-normal normal-case" id="mode-hint">※左の画像の高さが基準になります</span>
+                    </h2>
+                    
+                    <!-- 2-UP Mode Upload -->
+                    <div id="upload-panel-2up" class="grid grid-cols-2 gap-3">
+                        <!-- Left Image -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">左</label>
+                            <div id="drop-left" class="drop-zone aspect-[2/3] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
+                                onclick="document.getElementById('file-left').click()">
+                                <input type="file" id="file-left" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'left')">
+                                <div id="preview-icon-left" class="text-center p-2 transition-opacity group-hover:opacity-70">
+                                    <i class="fa-solid fa-plus text-xl text-gray-300 mb-1"></i>
+                                </div>
+                                <img id="thumb-left" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
+                            </div>
+                        </div>
+                        <!-- Right Image -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">右</label>
+                            <div id="drop-right" class="drop-zone aspect-[2/3] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
+                                onclick="document.getElementById('file-right').click()">
+                                <input type="file" id="file-right" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'right')">
+                                <div id="preview-icon-right" class="text-center p-2 transition-opacity group-hover:opacity-70">
+                                    <i class="fa-solid fa-plus text-xl text-gray-300 mb-1"></i>
+                                </div>
+                                <img id="thumb-right" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4-UP Mode Upload (Hidden by default) -->
+                    <div id="upload-panel-4up" class="grid grid-cols-2 gap-3 hidden">
+                        <!-- Top Left -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">左上 (基準)</label>
+                            <div id="drop-tl" class="drop-zone aspect-[3/4] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
+                                onclick="document.getElementById('file-tl').click()">
+                                <input type="file" id="file-tl" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'tl')">
+                                <div id="preview-icon-tl" class="text-center p-2 transition-opacity group-hover:opacity-70">
+                                    <i class="fa-solid fa-plus text-lg text-gray-300 mb-1"></i>
+                                </div>
+                                <img id="thumb-tl" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
+                            </div>
+                        </div>
+                        <!-- Top Right -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">右上</label>
+                            <div id="drop-tr" class="drop-zone aspect-[3/4] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
+                                onclick="document.getElementById('file-tr').click()">
+                                <input type="file" id="file-tr" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'tr')">
+                                <div id="preview-icon-tr" class="text-center p-2 transition-opacity group-hover:opacity-70">
+                                    <i class="fa-solid fa-plus text-lg text-gray-300 mb-1"></i>
+                                </div>
+                                <img id="thumb-tr" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
+                            </div>
+                        </div>
+                        <!-- Bottom Left -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">左下</label>
+                            <div id="drop-bl" class="drop-zone aspect-[3/4] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
+                                onclick="document.getElementById('file-bl').click()">
+                                <input type="file" id="file-bl" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'bl')">
+                                <div id="preview-icon-bl" class="text-center p-2 transition-opacity group-hover:opacity-70">
+                                    <i class="fa-solid fa-plus text-lg text-gray-300 mb-1"></i>
+                                </div>
+                                <img id="thumb-bl" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
+                            </div>
+                        </div>
+                        <!-- Bottom Right -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">右下</label>
+                            <div id="drop-br" class="drop-zone aspect-[3/4] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
+                                onclick="document.getElementById('file-br').click()">
+                                <input type="file" id="file-br" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'br')">
+                                <div id="preview-icon-br" class="text-center p-2 transition-opacity group-hover:opacity-70">
+                                    <i class="fa-solid fa-plus text-lg text-gray-300 mb-1"></i>
+                                </div>
+                                <img id="thumb-br" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Panel -->
+                <div class="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-gray-100 space-y-4">
+                    <h2 class="font-bold text-sm text-gray-600 uppercase tracking-wide">調整</h2>
+
+                    <!-- Gap Slider -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between items-center">
+                            <label for="gap-slider" class="text-xs font-medium text-gray-600">画像間の隙間</label>
+                            <span id="gap-val" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">20px</span>
+                        </div>
+                        <input type="range" id="gap-slider" min="0" max="150" value="20" 
+                            class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+
+                    <!-- Margin Slider -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between items-center">
+                            <label for="margin-slider" class="text-xs font-medium text-gray-600">外周マージン</label>
+                            <span id="margin-val" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">1px</span>
+                        </div>
+                        <input type="range" id="margin-slider" min="0" max="100" value="1" 
+                            class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+
+                    <!-- Background Color -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600 block mb-2">背景色</label>
+                        <div class="flex gap-1.5">
+                            <button type="button" aria-label="White background" onclick="setBgColor('#ffffff')" class="w-7 h-7 rounded-md border border-gray-300 bg-white shadow-sm focus:ring-2 ring-blue-400 focus:outline-none transition hover:border-blue-400"></button>
+                            <button type="button" aria-label="Black background" onclick="setBgColor('#000000')" class="w-7 h-7 rounded-md border border-gray-300 bg-black shadow-sm focus:ring-2 ring-blue-400 focus:outline-none transition hover:border-blue-400"></button>
+                            <button type="button" aria-label="Gray background" onclick="setBgColor('#f3f4f6')" class="w-7 h-7 rounded-md border border-gray-300 bg-gray-100 shadow-sm focus:ring-2 ring-blue-400 focus:outline-none transition hover:border-blue-400"></button>
+                            <div class="relative w-7 h-7 rounded-md border border-gray-300 overflow-hidden shadow-sm focus-within:ring-2 ring-blue-400 transition hover:border-blue-400">
+                                <input type="color" id="bg-picker" value="#ffffff" oninput="updateCanvas()" class="absolute inset-0 w-[150%] h-[150%] -top-1/4 -left-1/4 cursor-pointer p-0 border-0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions Panel -->
+                <div class="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-gray-100">
+                    <button onclick="downloadImage()" id="download-btn" disabled
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        <i class="fa-solid fa-download"></i> 画像を保存
+                    </button>
+                    <p class="text-[10px] text-gray-400 mt-2 text-center">※保存時は長辺2000pxに自動リサイズされます</p>
+                </div>
+            </div>
+
+            <!-- Right Sidebar: Preview Area -->
+            <div class="lg:col-span-8 flex flex-col h-[calc(100vh-200px)] lg:h-[calc(100vh-120px)] min-h-[400px] sticky top-6">
+                <div class="bg-white p-1 rounded-xl shadow-sm border border-gray-100 flex-grow flex flex-col relative">
+                    <div class="flex-grow checkered-bg rounded-lg overflow-hidden relative flex items-center justify-center p-4 md:p-6">
+                        
+                        <!-- Loading Indicator (Optional enhancement) -->
+                        <div id="loading-indicator" class="absolute inset-0 bg-white bg-opacity-70 z-10 hidden items-center justify-center">
+                             <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500"></i>
+                        </div>
+
+                        <!-- Canvas -->
+                        <canvas id="canvas" class="max-w-full max-h-full shadow-md object-contain hidden transition-opacity duration-300"></canvas>
+                        
+                        <!-- Empty State -->
+                        <div id="empty-state" class="text-center text-gray-300 select-none">
+                            <div class="mb-3">
+                                <i class="fa-solid fa-photo-film text-5xl md:text-6xl opacity-20"></i>
+                            </div>
+                            <p class="text-base md:text-lg font-medium text-gray-400">プレビューエリア</p>
+                            <p class="text-xs md:text-sm text-gray-400 mt-1">画像を追加するとここに表示されます</p>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-center text-xs text-gray-400 mt-3 flex-none">
+                    ※プレビューは縮小表示されています。保存時は元の高解像度で出力されます。
+                </p>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- State Management ---
+        const state = {
+            mode: '2up', // '2up' or '4up'
+            images: {
+                // 2-up mode
+                left: null, right: null,
+                // 4-up mode
+                tl: null, tr: null, bl: null, br: null
+            },
+            gap: 20,
+            margin: 1,
+            bgColor: '#ffffff',
+            isDrawing: false
+        };
+
+        // --- Elements ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const emptyState = document.getElementById('empty-state');
+        const downloadBtn = document.getElementById('download-btn');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        
+        const gapSlider = document.getElementById('gap-slider');
+        const marginSlider = document.getElementById('margin-slider');
+        const bgPicker = document.getElementById('bg-picker');
+        const gapVal = document.getElementById('gap-val');
+        const marginVal = document.getElementById('margin-val');
+
+        const tab2up = document.getElementById('tab-2up');
+        const tab4up = document.getElementById('tab-4up');
+        const panel2up = document.getElementById('upload-panel-2up');
+        const panel4up = document.getElementById('upload-panel-4up');
+        const modeHint = document.getElementById('mode-hint');
+
+        // --- Initialization ---
+        // Setup Drag & Drop for all zones
+        ['left', 'right', 'tl', 'tr', 'bl', 'br'].forEach(id => setupDropZone(`drop-${id}`, id));
+
+        // --- Event Listeners ---
+        gapSlider.addEventListener('input', (e) => {
+            state.gap = parseInt(e.target.value);
+            gapVal.textContent = `${state.gap}px`;
+            debouncedUpdateCanvas();
+        });
+
+        marginSlider.addEventListener('input', (e) => {
+            state.margin = parseInt(e.target.value);
+            marginVal.textContent = `${state.margin}px`;
+            debouncedUpdateCanvas();
+        });
+
+        // Debounce function for smoother slider updates
+        let debounceTimer;
+        function debouncedUpdateCanvas() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(updateCanvas, 10);
+        }
+
+
+        // --- Mode Switching ---
+        function switchMode(newMode) {
+            if (state.mode === newMode) return;
+            
+            // 1. Update State
+            state.mode = newMode;
+
+            // 2. Update UI (Tabs & Panels)
+            if (newMode === '2up') {
+                tab2up.classList.add('tab-active', 'border-blue-500', 'text-blue-500');
+                tab4up.classList.remove('tab-active', 'border-blue-500', 'text-blue-500');
+                panel2up.classList.remove('hidden');
+                panel4up.classList.add('hidden');
+                modeHint.textContent = "※左の画像の高さが基準になります";
+            } else {
+                tab4up.classList.add('tab-active', 'border-blue-500', 'text-blue-500');
+                tab2up.classList.remove('tab-active', 'border-blue-500', 'text-blue-500');
+                panel4up.classList.remove('hidden');
+                panel2up.classList.add('hidden');
+                modeHint.textContent = "※左上(基準)の高さに揃います";
+            }
+
+            // 3. Reset images for the new mode and redraw
+            resetImagesForMode(newMode);
+            updateCanvas();
+        }
+
+
+        // --- File Handling ---
+        function setupDropZone(elementId, side) {
+            const el = document.getElementById(elementId);
+            
+            el.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                el.classList.add('drag-over');
+            });
+            ['dragleave', 'dragend'].forEach(type => {
+                el.addEventListener(type, () => el.classList.remove('drag-over'));
+            });
+            el.addEventListener('drop', (e) => {
+                e.preventDefault();
+                el.classList.remove('drag-over');
+                if (e.dataTransfer.files.length > 0) {
+                    processFile(e.dataTransfer.files[0], side);
+                }
+            });
+        }
+
+        function handleFileSelect(event, side) {
+            if (event.target.files.length > 0) {
+                processFile(event.target.files[0], side);
+            }
+            // Reset file input so the same file can be selected again
+            event.target.value = ''; 
+        }
+
+        function processFile(file, side) {
+            if (!file.type.startsWith('image/')) {
+                alert('画像ファイルを選択してください。');
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden'); // Show loading
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    state.images[side] = img;
+                    updateThumbnail(`thumb-${side}`, `preview-icon-${side}`, img.src);
+                    updateCanvas();
+                    loadingIndicator.classList.add('hidden'); // Hide loading
+                };
+                img.onerror = () => {
+                     alert('画像の読み込みに失敗しました。');
+                     loadingIndicator.classList.add('hidden');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateThumbnail(imgId, iconId, src) {
+            document.getElementById(imgId).src = src;
+            document.getElementById(imgId).classList.remove('hidden');
+            document.getElementById(iconId).classList.add('opacity-0');
+        }
+        
+        function clearThumbnail(side) {
+            const imgEl = document.getElementById(`thumb-${side}`);
+            const iconEl = document.getElementById(`preview-icon-${side}`);
+            imgEl.src = '';
+            imgEl.classList.add('hidden');
+            iconEl.classList.remove('opacity-0');
+            state.images[side] = null;
+        }
+
+
+        // --- Canvas Drawing Logic ---
+        function setBgColor(color) {
+            state.bgColor = color;
+            bgPicker.value = color;
+            updateCanvas();
+        }
+
+        function updateCanvas() {
+            if (state.isDrawing) return;
+            state.isDrawing = true;
+
+            const mode = state.mode;
+            const imgs = state.images;
+            let hasAnyImage = false;
+
+            if (mode === '2up') {
+                hasAnyImage = imgs.left || imgs.right;
+            } else {
+                hasAnyImage = imgs.tl || imgs.tr || imgs.bl || imgs.br;
+            }
+
+            if (!hasAnyImage) {
+                canvas.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                downloadBtn.disabled = true;
+                state.isDrawing = false;
+                return;
+            }
+
+            canvas.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+            downloadBtn.disabled = false;
+
+            // Determine Base Image based on mode
+            let baseImage = (mode === '2up') ? (imgs.left || imgs.right) : (imgs.tl || imgs.tr || imgs.bl || imgs.br);
+            if (!baseImage) {
+                 // Should be covered by hasAnyImage check, but as a fallback
+                 state.isDrawing = false; return;
+            }
+            
+            // Use Left or Top-Left as preferred base for height if available
+            if (mode === '2up' && imgs.left) baseImage = imgs.left;
+            if (mode === '4up' && imgs.tl) baseImage = imgs.tl;
+
+            const baseHeight = baseImage.height;
+            const m = state.margin;
+            const g = state.gap;
+
+            // Helper to calculate scaled width
+            const getScaledWidth = (img) => img ? (img.width * (baseHeight / img.height)) : 0;
+
+            let totalWidth, totalHeight;
+
+            if (mode === '2up') {
+                // --- 2-UP Layout Calculation ---
+                const wLeft = getScaledWidth(imgs.left);
+                const wRight = getScaledWidth(imgs.right);
+
+                totalWidth = m + wLeft + (imgs.left && imgs.right ? g : 0) + wRight + m;
+                totalHeight = m + baseHeight + m;
+
+                canvas.width = totalWidth;
+                canvas.height = totalHeight;
+
+                fillBackground(totalWidth, totalHeight);
+
+                // Draw
+                let currentX = m;
+                if (imgs.left) {
+                    ctx.drawImage(imgs.left, currentX, m, wLeft, baseHeight);
+                    currentX += wLeft + g;
+                }
+                if (imgs.right) {
+                    // If left is missing, start from margin
+                    currentX = imgs.left ? currentX : m; 
+                    ctx.drawImage(imgs.right, currentX, m, wRight, baseHeight);
+                }
+
+            } else {
+                // --- 4-UP Grid Layout Calculation ---
+                // Row 1 Widths
+                const wTL = getScaledWidth(imgs.tl);
+                const wTR = getScaledWidth(imgs.tr);
+                // Row 2 Widths
+                const wBL = getScaledWidth(imgs.bl);
+                const wBR = getScaledWidth(imgs.br);
+                
+                // Calculate column widths based on the widest image in that column
+                const col1Width = Math.max(wTL, wBL);
+                const col2Width = Math.max(wTR, wBR);
+                
+                // Calculate row heights (they are uniform due to scaling baseHeight)
+                const row1Height = (imgs.tl || imgs.tr) ? baseHeight : 0;
+                const row2Height = (imgs.bl || imgs.br) ? baseHeight : 0;
+
+                totalWidth = m + col1Width + ((col1Width>0 && col2Width>0) ? g : 0) + col2Width + m;
+                totalHeight = m + row1Height + ((row1Height>0 && row2Height>0) ? g : 0) + row2Height + m;
+
+                // Handle edge case where a row or column is empty to avoid extra gap/margin
+                if (totalWidth === 2*m) totalWidth = 0;
+                if (totalHeight === 2*m) totalHeight = 0;
+                
+                if (totalWidth === 0 || totalHeight === 0) {
+                     canvas.classList.add('hidden'); emptyState.classList.remove('hidden'); downloadBtn.disabled = true; state.isDrawing = false; return;
+                }
+
+                canvas.width = totalWidth;
+                canvas.height = totalHeight;
+
+                fillBackground(totalWidth, totalHeight);
+
+                // Draw Row 1
+                if (row1Height > 0) {
+                    if (imgs.tl) ctx.drawImage(imgs.tl, m, m, wTL, baseHeight);
+                    if (imgs.tr) {
+                        // Align right column start X
+                        const startX = m + col1Width + (col1Width>0 ? g : 0);
+                        ctx.drawImage(imgs.tr, startX, m, wTR, baseHeight);
+                    }
+                }
+                
+                // Draw Row 2
+                if (row2Height > 0) {
+                    const startY = m + row1Height + (row1Height>0 ? g : 0);
+                    if (imgs.bl) ctx.drawImage(imgs.bl, m, startY, wBL, baseHeight);
+                    if (imgs.br) {
+                        const startX = m + col1Width + (col1Width>0 ? g : 0);
+                        ctx.drawImage(imgs.br, startX, startY, wBR, baseHeight);
+                    }
+                }
+            }
+            state.isDrawing = false;
+        }
+
+        function fillBackground(w, h) {
+            state.bgColor = bgPicker.value;
+            ctx.fillStyle = state.bgColor;
+            ctx.fillRect(0, 0, w, h);
+        }
+
+
+        // --- Reset Functions ---
+        function resetAll() {
+            resetImagesForMode('2up');
+            resetImagesForMode('4up');
+            
+            // Reset Settings
+            state.gap = 20; gapSlider.value = 20; gapVal.textContent = '20px';
+            state.margin = 1; marginSlider.value = 1; marginVal.textContent = '1px';
+            state.bgColor = '#ffffff'; bgPicker.value = '#ffffff';
+
+            // Reset to default mode 2up
+            if (state.mode !== '2up') {
+                 switchMode('2up');
+            } else {
+                 updateCanvas();
+            }
+        }
+        
+        function resetImagesForMode(mode) {
+            const sides = mode === '2up' ? ['left', 'right'] : ['tl', 'tr', 'bl', 'br'];
+            sides.forEach(side => clearThumbnail(side));
+        }
+
+        // --- Download ---
+        function downloadImage() {
+            if (canvas.classList.contains('hidden')) return;
+
+            // Always resize to 2000px
+            const maxDim = 2000;
+            const currentWidth = canvas.width;
+            const currentHeight = canvas.height;
+            let targetWidth, targetHeight;
+
+            if (currentWidth >= currentHeight) {
+                // Landscape or Square
+                targetWidth = maxDim;
+                targetHeight = Math.round(currentHeight * (maxDim / currentWidth));
+            } else {
+                // Portrait
+                targetHeight = maxDim;
+                targetWidth = Math.round(currentWidth * (maxDim / currentHeight));
+            }
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = targetWidth;
+            tempCanvas.height = targetHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // High quality resize settings
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+
+            tempCtx.drawImage(canvas, 0, 0, targetWidth, targetHeight);
+            const finalUrl = tempCanvas.toDataURL('image/png');
+
+            const link = document.createElement('a');
+            // Set filename based on mode and timestamp
+            const date = new Date();
+            const timestamp = date.toISOString().slice(0,19).replace(/[-T:]/g,"");
+            link.download = `combined-${state.mode}-${timestamp}.png`;
+            link.href = finalUrl;
+            link.click();
+        }
+
+    </script>
+</body>
+</html>
