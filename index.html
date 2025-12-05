@@ -78,31 +78,38 @@
                     </h2>
                     
                     <!-- 2-UP Mode Upload -->
-                    <div id="upload-panel-2up" class="grid grid-cols-2 gap-3">
-                        <!-- Left Image -->
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">左</label>
-                            <div id="drop-left" class="drop-zone aspect-[2/3] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
-                                onclick="document.getElementById('file-left').click()">
-                                <input type="file" id="file-left" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'left')">
-                                <div id="preview-icon-left" class="text-center p-2 transition-opacity group-hover:opacity-70">
-                                    <i class="fa-solid fa-plus text-xl text-gray-300 mb-1"></i>
+                    <div id="upload-panel-2up" class="relative">
+                        <div class="grid grid-cols-2 gap-3">
+                            <!-- Left Image -->
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">左</label>
+                                <div id="drop-left" class="drop-zone aspect-[2/3] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
+                                    onclick="document.getElementById('file-left').click()">
+                                    <input type="file" id="file-left" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'left')">
+                                    <div id="preview-icon-left" class="text-center p-2 transition-opacity group-hover:opacity-70">
+                                        <i class="fa-solid fa-plus text-xl text-gray-300 mb-1"></i>
+                                    </div>
+                                    <img id="thumb-left" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
                                 </div>
-                                <img id="thumb-left" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
+                            </div>
+                            <!-- Right Image -->
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">右</label>
+                                <div id="drop-right" class="drop-zone aspect-[2/3] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
+                                    onclick="document.getElementById('file-right').click()">
+                                    <input type="file" id="file-right" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'right')">
+                                    <div id="preview-icon-right" class="text-center p-2 transition-opacity group-hover:opacity-70">
+                                        <i class="fa-solid fa-plus text-xl text-gray-300 mb-1"></i>
+                                    </div>
+                                    <img id="thumb-right" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
+                                </div>
                             </div>
                         </div>
-                        <!-- Right Image -->
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1 text-center truncate">右</label>
-                            <div id="drop-right" class="drop-zone aspect-[2/3] rounded-lg flex flex-col items-center justify-center cursor-pointer relative bg-gray-50 overflow-hidden group"
-                                onclick="document.getElementById('file-right').click()">
-                                <input type="file" id="file-right" class="hidden" accept="image/*" onchange="handleFileSelect(event, 'right')">
-                                <div id="preview-icon-right" class="text-center p-2 transition-opacity group-hover:opacity-70">
-                                    <i class="fa-solid fa-plus text-xl text-gray-300 mb-1"></i>
-                                </div>
-                                <img id="thumb-right" class="absolute inset-0 w-full h-full object-cover hidden pointer-events-none opacity-50">
-                            </div>
-                        </div>
+                        
+                        <!-- Swap Button (Absolute Center) -->
+                        <button onclick="swapImages()" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[-2px] bg-white hover:bg-blue-50 text-blue-500 border border-gray-200 shadow-md rounded-full w-8 h-8 flex items-center justify-center transition hover:scale-110 z-10" title="左右を入れ替え">
+                            <i class="fa-solid fa-arrow-right-arrow-left text-sm"></i>
+                        </button>
                     </div>
 
                     <!-- 4-UP Mode Upload (Hidden by default) -->
@@ -166,9 +173,9 @@
                     <div class="space-y-1">
                         <div class="flex justify-between items-center">
                             <label for="gap-slider" class="text-xs font-medium text-gray-600">画像間の隙間</label>
-                            <span id="gap-val" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">20px</span>
+                            <span id="gap-val" class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">5px</span>
                         </div>
-                        <input type="range" id="gap-slider" min="0" max="150" value="20" 
+                        <input type="range" id="gap-slider" min="0" max="150" value="5" 
                             class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-300">
                     </div>
 
@@ -202,7 +209,7 @@
                         class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                         <i class="fa-solid fa-download"></i> 画像を保存
                     </button>
-                    <p class="text-[10px] text-gray-400 mt-2 text-center">※保存時は長辺2000pxに自動リサイズされます</p>
+                    <p class="text-[10px] text-gray-400 mt-2 text-center">※保存時は長辺1068px (72dpi) に自動リサイズされます</p>
                 </div>
             </div>
 
@@ -247,7 +254,7 @@
                 // 4-up mode
                 tl: null, tr: null, bl: null, br: null
             },
-            gap: 20,
+            gap: 5,
             margin: 1,
             bgColor: '#ffffff',
             isDrawing: false
@@ -392,6 +399,36 @@
             imgEl.classList.add('hidden');
             iconEl.classList.remove('opacity-0');
             state.images[side] = null;
+        }
+
+        // --- Swap Function ---
+        function swapImages() {
+            if (state.mode !== '2up') return;
+
+            // Swap State
+            const temp = state.images.left;
+            state.images.left = state.images.right;
+            state.images.right = temp;
+
+            // Swap UI Logic (Helper)
+            const syncUI = (side, imgObj) => {
+                const imgEl = document.getElementById(`thumb-${side}`);
+                const iconEl = document.getElementById(`preview-icon-${side}`);
+                if (imgObj) {
+                    imgEl.src = imgObj.src;
+                    imgEl.classList.remove('hidden');
+                    iconEl.classList.add('opacity-0');
+                } else {
+                    imgEl.src = '';
+                    imgEl.classList.add('hidden');
+                    iconEl.classList.remove('opacity-0');
+                }
+            };
+
+            syncUI('left', state.images.left);
+            syncUI('right', state.images.right);
+
+            updateCanvas();
         }
 
 
@@ -542,7 +579,7 @@
             resetImagesForMode('4up');
             
             // Reset Settings
-            state.gap = 20; gapSlider.value = 20; gapVal.textContent = '20px';
+            state.gap = 5; gapSlider.value = 5; gapVal.textContent = '5px';
             state.margin = 1; marginSlider.value = 1; marginVal.textContent = '1px';
             state.bgColor = '#ffffff'; bgPicker.value = '#ffffff';
 
@@ -563,8 +600,8 @@
         function downloadImage() {
             if (canvas.classList.contains('hidden')) return;
 
-            // Always resize to 2000px
-            const maxDim = 2000;
+            // Always resize to 1068px (72dpi web standard)
+            const maxDim = 1068;
             const currentWidth = canvas.width;
             const currentHeight = canvas.height;
             let targetWidth, targetHeight;
